@@ -1,0 +1,1621 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>轻记 - 个人财务记账</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --primary: #8B7355;
+      --primary-light: #C4A77D;
+      --danger: #E8A0A0;
+      --danger-dark: #D4736E;
+      --bg: #FDF8F3;
+      --card: #FFFAF5;
+      --text: #5D4037;
+      --text-secondary: #A08070;
+      --accent-green: #7CB08A;
+      --accent-yellow: #F5D89A;
+      --accent-pink: #F0C4C4;
+      --radius-card: 16px;
+      --radius-btn: 12px;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding-bottom: 70px;
+      overflow-x: hidden;
+    }
+    .page { display: none; padding: 16px; min-height: calc(100vh - 70px); }
+    .page.active { display: block; }
+
+    /* TabBar */
+    .tabbar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      height: 60px;
+      background: var(--card);
+      display: flex;
+      box-shadow: 0 -2px 12px rgba(139,115,85,0.06);
+      z-index: 100;
+    }
+    .tab-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-secondary);
+      font-size: 11px;
+      cursor: pointer;
+      border: none;
+      background: none;
+      transition: color 0.2s;
+    }
+    .tab-item.active { color: var(--primary); }
+    .tab-item svg { width: 22px; height: 22px; margin-bottom: 4px; }
+
+    /* Floating Add Button */
+    .fab {
+      position: fixed;
+      bottom: 75px;
+      right: 20px;
+      width: 56px; height: 56px;
+      border-radius: 50%;
+      background: var(--primary);
+      color: white;
+      border: none;
+      box-shadow: 0 4px 16px rgba(139,115,85,0.25);
+      cursor: pointer;
+      z-index: 99;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .fab svg { width: 28px; height: 28px; }
+    .fab:active { transform: scale(0.95); }
+
+    /* Card */
+    .card {
+      background: var(--card);
+      border-radius: var(--radius-card);
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 2px 12px rgba(139,115,85,0.08);
+    }
+
+    /* Overview Card */
+    .overview-card {
+      text-align: center;
+      padding: 24px 16px;
+    }
+    .overview-label {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+    .overview-amount {
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--danger);
+    }
+    .overview-meta {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 8px;
+    }
+
+    /* Record Item */
+    .record-item {
+      display: flex;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid #EDE4DA;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+    }
+    .record-item:last-child { border-bottom: none; }
+    .record-icon { font-size: 24px; margin-right: 12px; }
+    .record-info { flex: 1; }
+    .record-category { font-size: 15px; font-weight: 500; }
+    .record-note { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+    .record-amount { font-size: 15px; font-weight: 600; color: var(--danger); }
+    .record-time { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+
+    /* Category Selector */
+    .category-selector {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 12px 0;
+    }
+    .category-chip {
+      display: flex;
+      align-items: center;
+      padding: 8px 14px;
+      border-radius: 20px;
+      background: #FFF5EB;
+      font-size: 13px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    .category-chip.selected {
+      border-color: var(--primary);
+      background: rgba(139,115,85,0.12);
+    }
+    .category-chip .icon { margin-right: 6px; }
+
+    /* Form Elements */
+    .input-group { margin-bottom: 16px; }
+    .input-label {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+    .input-field {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #E8DDD4;
+      border-radius: var(--radius-btn);
+      font-size: 16px;
+      outline: none;
+      transition: border-color 0.2s;
+      background: #FFFAF5;
+    }
+    .input-field:focus { border-color: var(--primary-light); }
+
+
+    /* Amount Input */
+    .amount-input-wrapper {
+      display: flex;
+      align-items: center;
+      font-size: 32px;
+      font-weight: 700;
+      padding: 16px 0;
+    }
+    .amount-input-wrapper .symbol {
+      font-size: 24px;
+      color: var(--text-secondary);
+      margin-right: 4px;
+    }
+    .amount-input {
+      border: none;
+      outline: none;
+      font-size: 32px;
+      font-weight: 700;
+      width: 100%;
+      background: transparent;
+      color: var(--text);
+    }
+
+    /* Number Pad */
+    .number-pad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .num-key {
+      height: 52px;
+      border-radius: var(--radius-btn);
+      border: none;
+      background: var(--card);
+      font-size: 20px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .num-key:active { background: #F5EBE6; }
+    .num-key.done { background: var(--primary); color: white; }
+
+    /* Buttons */
+    .btn {
+      width: 100%;
+      padding: 14px;
+      border-radius: var(--radius-btn);
+      border: none;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-danger { background: var(--danger); color: white; }
+
+    /* Empty State */
+    .empty-state {
+      text-align: center;
+      padding: 48px 24px;
+    }
+    .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
+    .empty-state .desc { color: var(--text-secondary); font-size: 14px; }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-100px);
+      background: rgba(0,0,0,0.75);
+      color: white;
+      padding: 12px 24px;
+      border-radius: 24px;
+      font-size: 14px;
+      z-index: 1000;
+      transition: transform 0.3s ease;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+
+    /* Section Title */
+    .section-title {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+      padding-left: 4px;
+    }
+
+    /* Record List by Day */
+    .day-group { margin-bottom: 16px; }
+    .day-header {
+      font-size: 12px;
+      color: var(--text-secondary);
+      padding: 8px 4px;
+    }
+    .day-total { float: right; color: var(--danger); font-weight: 600; }
+
+    /* Stats Page */
+    .stats-month-selector {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    .stats-month-selector button {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 8px;
+      color: var(--primary);
+    }
+    .stats-month-selector .current-month {
+      font-size: 16px;
+      font-weight: 600;
+      min-width: 100px;
+      text-align: center;
+    }
+    .stats-summary {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .stats-summary .item {
+      background: var(--card);
+      border-radius: var(--radius-card);
+      padding: 16px;
+      text-align: center;
+    }
+    .stats-summary .value {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--danger);
+    }
+    .stats-summary .label {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+    .chart-container { height: 200px; margin-bottom: 16px; }
+
+    /* Detail Page */
+    .detail-header {
+      text-align: center;
+      padding: 24px 0;
+    }
+    .detail-amount {
+      font-size: 40px;
+      font-weight: 700;
+      color: var(--danger);
+    }
+    .detail-date { font-size: 14px; color: var(--text-secondary); margin-top: 8px; }
+    .detail-meta {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 12px;
+      font-size: 14px;
+    }
+    .detail-note {
+      background: var(--card);
+      border-radius: var(--radius-card);
+      padding: 16px;
+      margin-top: 16px;
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+    .detail-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+    }
+    .detail-actions .btn { flex: 1; }
+
+    /* Header */
+    .page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 4px;
+      margin-bottom: 16px;
+    }
+    .page-header h1 { font-size: 18px; font-weight: 600; }
+    .back-btn { background: none; border: none; cursor: pointer; padding: 4px; }
+
+    /* Swipe delete */
+    .swipe-wrapper { position: relative; overflow: hidden; }
+    .swipe-delete {
+      position: absolute;
+      right: 0; top: 0; bottom: 0;
+      width: 70px;
+      background: var(--danger);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      cursor: pointer;
+      transform: translateX(100%);
+      transition: transform 0.2s;
+    }
+    .swipe-wrapper.open .swipe-delete { transform: translateX(0); }
+
+
+    /* Top Day Badge */
+    .top-day {
+      display: inline-flex;
+      align-items: center;
+      background: rgba(255,107,107,0.1);
+      color: var(--danger);
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      margin-top: 8px;
+    }
+
+    /* Me Page */
+    .me-stats {
+      background: var(--card);
+      border-radius: var(--radius-card);
+      padding: 20px;
+    }
+    .me-stat-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 12px 0;
+      border-bottom: 1px solid #EDE4DA;
+      font-size: 14px;
+    }
+    .me-stat-item:last-child { border-bottom: none; }
+    .me-stat-item .value { font-weight: 600; color: var(--danger); }
+
+
+    /* Auth Pages */
+    .auth-page {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: calc(100vh - 70px);
+      padding: 24px 16px;
+    }
+    .auth-logo {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+    .auth-title {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--text);
+    }
+    .auth-subtitle {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-bottom: 32px;
+    }
+    .auth-form {
+      width: 100%;
+      max-width: 320px;
+    }
+    .auth-form .input-group { margin-bottom: 16px; }
+    .auth-form .btn { margin-top: 8px; }
+    .auth-footer {
+      margin-top: 24px;
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+    .auth-footer a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .auth-error {
+      background: rgba(232,160,160,0.15);
+      color: var(--danger-dark);
+      padding: 10px 16px;
+      border-radius: var(--radius-btn);
+      font-size: 13px;
+      margin-bottom: 16px;
+      text-align: center;
+      display: none;
+    }
+    .auth-error.show { display: block; }
+
+    /* User badge in header */
+    .user-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      background: rgba(139,115,85,0.1);
+      padding: 4px 10px;
+      border-radius: 12px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Page: Home -->
+<div class="page active" id="page-home">
+  <div class="card overview-card">
+    <div class="overview-label">今日消费</div>
+    <div class="overview-amount" id="today-amount">¥0.00</div>
+    <div class="overview-meta" id="today-count">共 0 笔</div>
+  </div>
+  <div class="section-title">最近记录</div>
+  <div class="card" id="recent-records">
+    <div class="empty-state">
+      <div class="icon">📒</div>
+      <div class="desc">今天还没有记账哦<br>开始记一笔吧~</div>
+    </div>
+  </div>
+</div>
+
+<!-- Page: Add -->
+<div class="page" id="page-add">
+  <div class="page-header">
+    <button class="back-btn" onclick="goHome()">
+      <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <h1>记一笔</h1>
+    <div style="width:24px"></div>
+  </div>
+  <div class="card">
+    <div class="input-group">
+      <div class="input-label">金额</div>
+      <div class="amount-input-wrapper">
+        <span class="symbol">¥</span>
+        <input type="text" class="amount-input" id="amount-input" placeholder="0.00" inputmode="decimal">
+      </div>
+    </div>
+    <div class="input-group">
+      <div class="input-label">分类</div>
+      <div class="category-selector" id="category-selector"></div>
+    </div>
+    <div class="input-group">
+      <div class="input-label">日期</div>
+      <input type="date" class="input-field" id="date-input">
+    </div>
+    <div class="input-group">
+      <div class="input-label">备注（可选）</div>
+      <input type="text" class="input-field" id="note-input" placeholder="如：瑞幸咖啡" maxlength="50">
+    </div>
+    <button class="btn btn-primary" id="save-btn" disabled onclick="saveRecord()">保存</button>
+  </div>
+</div>
+
+<!-- Page: Records -->
+<div class="page" id="page-records">
+  <div class="page-header">
+    <h1>账单</h1>
+  </div>
+  <div id="records-list"></div>
+</div>
+
+<!-- Page: Stats -->
+<div class="page" id="page-stats">
+  <div class="page-header">
+    <h1>统计</h1>
+  </div>
+  <div class="stats-month-selector">
+    <button onclick="changeMonth(-1)">
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <span class="current-month" id="stats-month-label">2026年06月</span>
+    <button onclick="changeMonth(1)">
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+    </button>
+  </div>
+  <div class="stats-summary">
+    <div class="item">
+      <div class="value" id="stats-total">¥0</div>
+      <div class="label">本月支出</div>
+    </div>
+    <div class="item">
+      <div class="value" id="stats-compare">--</div>
+      <div class="label">对比上月</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="input-label">各类别占比</div>
+    <div class="chart-container">
+      <canvas id="pie-chart"></canvas>
+    </div>
+  </div>
+  <div class="card">
+    <div class="input-label">近6个月趋势</div>
+    <div class="chart-container">
+      <canvas id="line-chart"></canvas>
+    </div>
+  </div>
+  <div class="top-day" id="top-day" style="display:none">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+    <span id="top-day-text"></span>
+  </div>
+</div>
+
+<!-- Page: Record Detail -->
+<div class="page" id="page-record">
+  <div class="page-header">
+    <button class="back-btn" onclick="goBack()">
+      <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <h1 id="detail-title">详情</h1>
+    <div style="width:24px"></div>
+  </div>
+  <div class="card detail-header">
+    <div class="detail-amount" id="detail-amount">¥0.00</div>
+    <div class="detail-date" id="detail-date"></div>
+    <div class="detail-meta">
+      <span id="detail-icon"></span>
+      <span id="detail-category"></span>
+    </div>
+  </div>
+  <div class="detail-note" id="detail-note-box">
+    <strong>备注</strong>
+    <div id="detail-note-text" style="margin-top:6px;color:#666"></div>
+  </div>
+  <div class="detail-actions">
+    <button class="btn btn-primary" onclick="editRecord()">编辑</button>
+    <button class="btn btn-danger" onclick="confirmDelete()">删除</button>
+  </div>
+</div>
+
+<!-- Page: Me -->
+<div class="page" id="page-me">
+  <div class="page-header">
+    <h1>我的</h1>
+  </div>
+  <div class="card" style="text-align:center;padding:20px">
+    <div style="font-size:32px;margin-bottom:8px">👤</div>
+    <div id="me-username" style="font-size:16px;font-weight:600"></div>
+  </div>
+  <div class="card me-stats">
+    <div class="me-stat-item">
+      <span>记账总笔数</span>
+      <span class="value" id="me-total-count">0</span>
+    </div>
+    <div class="me-stat-item">
+      <span>累计支出</span>
+      <span class="value" id="me-total-amount">¥0</span>
+    </div>
+    <div class="me-stat-item">
+      <span>已记账天数</span>
+      <span class="value" id="me-days">0</span>
+    </div>
+    <div class="me-stat-item">
+      <span>最高消费日</span>
+      <span class="value" id="me-top-day">--</span>
+    </div>
+  </div>
+  <button class="btn btn-danger" style="margin-top:12px" onclick="doLogout()">退出登录</button>
+</div>
+
+<!-- Page: Login -->
+<div class="page" id="page-login">
+  <div class="auth-page">
+    <div class="auth-logo">🍵</div>
+    <div class="auth-title">欢迎回来</div>
+    <div class="auth-subtitle">登录您的轻记账号</div>
+    <div class="auth-form">
+      <div class="auth-error" id="login-error"></div>
+      <div class="input-group">
+        <div class="input-label">用户名</div>
+        <input type="text" class="input-field" id="login-username" placeholder="请输入用户名" autocomplete="username">
+      </div>
+      <div class="input-group">
+        <div class="input-label">密码</div>
+        <input type="password" class="input-field" id="login-password" placeholder="请输入密码" autocomplete="current-password">
+      </div>
+      <button class="btn btn-primary" onclick="doLogin()">登录</button>
+    </div>
+    <div class="auth-footer">
+      还没有账号？<a href="#/register" onclick="navigate('#/register')">立即注册</a>
+    </div>
+  </div>
+</div>
+
+<!-- Page: Register -->
+<div class="page" id="page-register">
+  <div class="auth-page">
+    <div class="auth-logo">🍵</div>
+    <div class="auth-title">创建账号</div>
+    <div class="auth-subtitle">开始您的记账之旅</div>
+    <div class="auth-form">
+      <div class="auth-error" id="register-error"></div>
+      <div class="input-group">
+        <div class="input-label">用户名</div>
+        <input type="text" class="input-field" id="register-username" placeholder="3-20位字母或数字" autocomplete="username">
+      </div>
+      <div class="input-group">
+        <div class="input-label">密码</div>
+        <input type="password" class="input-field" id="register-password" placeholder="至少6位字符" autocomplete="new-password">
+      </div>
+      <div class="input-group">
+        <div class="input-label">确认密码</div>
+        <input type="password" class="input-field" id="register-confirm" placeholder="再次输入密码" autocomplete="new-password">
+      </div>
+      <button class="btn btn-primary" onclick="doRegister()">注册</button>
+    </div>
+    <div class="auth-footer">
+      已有账号？<a href="#/login" onclick="navigate('#/login')">立即登录</a>
+    </div>
+  </div>
+</div>
+
+<!-- TabBar -->
+<nav class="tabbar">
+  <button class="tab-item active" data-tab="home">
+    <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    <span>首页</span>
+  </button>
+  <button class="tab-item" data-tab="records">
+    <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+    <span>账单</span>
+  </button>
+  <button class="tab-item" data-tab="stats">
+    <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+    <span>统计</span>
+  </button>
+  <button class="tab-item" data-tab="me">
+    <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    <span>我的</span>
+  </button>
+</nav>
+
+<!-- Floating Add Button -->
+<button class="fab" onclick="goAdd()">
+  <svg fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+</button>
+
+<script>
+// ============ MD5 ============
+function md5(str) {
+  function safeAdd(x, y) {
+    var lsw = (x & 0xffff) + (y & 0xffff);
+    var msw = (x >> 16) + (y >> 16) + (lsw >> 16);
+    return (msw << 16) | (lsw & 0xffff);
+  }
+  function bitRotateLeft(num, cnt) {
+    return (num << cnt) | (num >>> (32 - cnt));
+  }
+  function md5cmn(q, a, b, x, s, t) {
+    return safeAdd(bitRotateLeft(safeAdd(safeAdd(a, q), safeAdd(x, t)), s), b);
+  }
+  function md5ff(a, b, c, d, x, s, t) {
+    return md5cmn((b & c) | ((~b) & d), a, b, x, s, t);
+  }
+  function md5gg(a, b, c, d, x, s, t) {
+    return md5cmn((b & d) | (c & (~d)), a, b, x, s, t);
+  }
+  function md5hh(a, b, c, d, x, s, t) {
+    return md5cmn(b ^ c ^ d, a, b, x, s, t);
+  }
+  function md5ii(a, b, c, d, x, s, t) {
+    return md5cmn(c ^ (b | (~d)), a, b, x, s, t);
+  }
+  function binlMD5(x, len) {
+    x[len >> 5] |= 0x80 << (len % 32);
+    x[(((len + 64) >>> 9) << 4) + 14] = len;
+    var a = 1732584193, b = -271733879, c = -1732584194, d = 271733878;
+    for (var i = 0; i < x.length; i += 16) {
+      var olda = a, oldb = b, oldc = c, oldd = d;
+      a = md5ff(a, b, c, d, x[i], 7, -680876936);
+      d = md5ff(d, a, b, c, x[i + 1], 12, -389564586);
+      c = md5ff(c, d, a, b, x[i + 2], 17, 606105819);
+      b = md5ff(b, c, d, a, x[i + 3], 22, -1044525330);
+      a = md5ff(a, b, c, d, x[i + 4], 7, -176418897);
+      d = md5ff(d, a, b, c, x[i + 5], 12, 1200080426);
+      c = md5ff(c, d, a, b, x[i + 6], 17, -1473231341);
+      b = md5ff(b, c, d, a, x[i + 7], 22, -45705983);
+      a = md5ff(a, b, c, d, x[i + 8], 7, 1770035416);
+      d = md5ff(d, a, b, c, x[i + 9], 12, -1958414417);
+      c = md5ff(c, d, a, b, x[i + 10], 17, -42063);
+      b = md5ff(b, c, d, a, x[i + 11], 22, -1990404162);
+      a = md5ff(a, b, c, d, x[i + 12], 7, 1804603682);
+      d = md5ff(d, a, b, c, x[i + 13], 12, -40341101);
+      c = md5ff(c, d, a, b, x[i + 14], 17, -1502002290);
+      b = md5ff(b, c, d, a, x[i + 15], 22, 1236535329);
+      a = md5gg(a, b, c, d, x[i + 1], 5, -165796510);
+      d = md5gg(d, a, b, c, x[i + 6], 9, -1069501632);
+      c = md5gg(c, d, a, b, x[i + 11], 14, 643137713);
+      b = md5gg(b, c, d, a, x[i], 20, -373897302);
+      a = md5gg(a, b, c, d, x[i + 5], 5, -701558691);
+      d = md5gg(d, a, b, c, x[i + 10], 9, 38016083);
+      c = md5gg(c, d, a, b, x[i + 15], 14, -660478335);
+      b = md5gg(b, c, d, a, x[i + 4], 20, -405537848);
+      a = md5gg(a, b, c, d, x[i + 9], 5, 568446438);
+      d = md5gg(d, a, b, c, x[i + 14], 9, -1019803690);
+      c = md5gg(c, d, a, b, x[i + 3], 14, -187363961);
+      b = md5gg(b, c, d, a, x[i + 8], 20, 1163531501);
+      a = md5gg(a, b, c, d, x[i + 13], 5, -1444681467);
+      d = md5gg(d, a, b, c, x[i + 2], 9, -51403784);
+      c = md5gg(c, d, a, b, x[i + 7], 14, 1735328473);
+      b = md5gg(b, c, d, a, x[i + 12], 20, -1926607734);
+      a = md5hh(a, b, c, d, x[i + 5], 4, -378558);
+      d = md5hh(d, a, b, c, x[i + 8], 11, -2022574463);
+      c = md5hh(c, d, a, b, x[i + 11], 16, 1839030562);
+      b = md5hh(b, c, d, a, x[i + 14], 23, -35309556);
+      a = md5hh(a, b, c, d, x[i + 1], 4, -1530992060);
+      d = md5hh(d, a, b, c, x[i + 4], 11, 1272893353);
+      c = md5hh(c, d, a, b, x[i + 7], 16, -155497632);
+      b = md5hh(b, c, d, a, x[i + 10], 23, -1094730640);
+      a = md5hh(a, b, c, d, x[i + 13], 4, 681279174);
+      d = md5hh(d, a, b, c, x[i], 11, -358537222);
+      c = md5hh(c, d, a, b, x[i + 3], 16, -722521979);
+      b = md5hh(b, c, d, a, x[i + 6], 23, 76029189);
+      a = md5hh(a, b, c, d, x[i + 9], 4, -640364487);
+      d = md5hh(d, a, b, c, x[i + 12], 11, -421815835);
+      c = md5hh(c, d, a, b, x[i + 15], 16, 530742520);
+      b = md5hh(b, c, d, a, x[i + 2], 23, -995338651);
+      a = md5ii(a, b, c, d, x[i], 6, -198630844);
+      d = md5ii(d, a, b, c, x[i + 7], 10, 1126891415);
+      c = md5ii(c, d, a, b, x[i + 14], 15, -1416354905);
+      b = md5ii(b, c, d, a, x[i + 5], 21, -57434055);
+      a = md5ii(a, b, c, d, x[i + 12], 6, 1700485571);
+      d = md5ii(d, a, b, c, x[i + 3], 10, -1894986606);
+      c = md5ii(c, d, a, b, x[i + 10], 15, -1051523);
+      b = md5ii(b, c, d, a, x[i + 1], 21, -2054922799);
+      a = md5ii(a, b, c, d, x[i + 8], 6, 1873313359);
+      d = md5ii(d, a, b, c, x[i + 15], 10, -30611744);
+      c = md5ii(c, d, a, b, x[i + 6], 15, -1560198380);
+      b = md5ii(b, c, d, a, x[i + 13], 21, 1309151649);
+      a = md5ii(a, b, c, d, x[i + 4], 6, -145523070);
+      d = md5ii(d, a, b, c, x[i + 11], 10, -1120210379);
+      c = md5ii(c, d, a, b, x[i + 2], 15, 718787259);
+      b = md5ii(b, c, d, a, x[i + 9], 21, -343485551);
+      a = safeAdd(a, olda);
+      b = safeAdd(b, oldb);
+      c = safeAdd(c, oldc);
+      d = safeAdd(d, oldd);
+    }
+    return [a, b, c, d];
+  }
+  function binl2hex(binarray) {
+    var hexTab = '0123456789abcdef';
+    var str = '';
+    for (var i = 0; i < binarray.length * 4; i++) {
+      str += hexTab.charAt((binarray[i >> 2] >> ((i % 4) * 8 + 4)) & 0xf) +
+             hexTab.charAt((binarray[i >> 2] >> ((i % 4) * 8)) & 0xf);
+    }
+    return str;
+  }
+  function str2binl(str) {
+    var bin = [];
+    for (var i = 0; i < str.length * 8; i += 8) {
+      bin[i >> 5] |= (str.charCodeAt(i / 8) & 0xff) << (i % 32);
+    }
+    return bin;
+  }
+  return binl2hex(binlMD5(str2binl(str), str.length * 8));
+}
+
+
+// ============ Account Service ============
+function AccountService() {
+  const USERS_KEY = 'users';
+  const CURRENT_USER_KEY = 'currentUser';
+
+  function getUsers() {
+    try { return JSON.parse(localStorage.getItem(USERS_KEY) || '[]'); }
+    catch { return []; }
+  }
+
+  function saveUsers(users) {
+    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+  }
+
+
+  function getCurrentUser() {
+    try { return JSON.parse(localStorage.getItem(CURRENT_USER_KEY) || 'null'); }
+    catch { return null; }
+  }
+
+  function setCurrentUser(user) {
+    if (user) localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
+    else localStorage.removeItem(CURRENT_USER_KEY);
+  }
+
+  function getRecordsKey(userId) {
+    return 'records_' + userId;
+  }
+
+  function getRecords(userId) {
+    try { return JSON.parse(localStorage.getItem(getRecordsKey(userId)) || '[]'); }
+    catch { return []; }
+  }
+
+  function saveRecords(userId, records) {
+    localStorage.setItem(getRecordsKey(userId), JSON.stringify(records));
+  }
+
+  return {
+    register(username, password) {
+      const users = getUsers();
+      if (users.find(u => u.username === username)) {
+        return { success: false, error: '用户名已存在' };
+      }
+      if (!/^[a-zA-Z0-9]{3,20}$/.test(username)) {
+        return { success: false, error: '用户名需3-20位字母或数字' };
+      }
+      if (password.length < 6) {
+        return { success: false, error: '密码至少6位字符' };
+      }
+      const user = {
+        id: uuid(),
+        username,
+        password: md5(password),
+        createdAt: Date.now()
+      };
+      users.push(user);
+      saveUsers(users);
+      setCurrentUser({ id: user.id, username: user.username });
+      return { success: true };
+    },
+
+    login(username, password) {
+      const users = getUsers();
+      const user = users.find(u => u.username === username);
+      if (!user) {
+        return { success: false, error: '用户名不存在' };
+      }
+      if (user.password !== md5(password)) {
+        return { success: false, error: '密码错误' };
+      }
+      setCurrentUser({ id: user.id, username: user.username });
+      return { success: true };
+    },
+
+    logout() {
+      setCurrentUser(null);
+    },
+
+    getCurrentUser() {
+      return getCurrentUser();
+    },
+
+    isLoggedIn() {
+      return !!getCurrentUser();
+    },
+
+    getRecords() {
+      const user = getCurrentUser();
+      if (!user) return [];
+      return getRecords(user.id);
+    },
+
+    saveRecords(records) {
+      const user = getCurrentUser();
+      if (!user) return;
+      saveRecords(user.id, records);
+    }
+  };
+}
+
+const accountService = AccountService();
+
+// ============ Categories ============
+const CATEGORIES = [
+  { id: 'food', name: '餐饮', icon: '🍜' },
+  { id: 'transport', name: '交通', icon: '🚌' },
+  { id: 'shopping', name: '购物', icon: '🛒' },
+  { id: 'entertainment', name: '娱乐', icon: '🎬' },
+  { id: 'medical', name: '医疗', icon: '💊' },
+  { id: 'communication', name: '通讯', icon: '📱' },
+  { id: 'housing', name: '居住', icon: '🏠' },
+  { id: 'travel', name: '旅游', icon: '✈️' },
+  { id: 'education', name: '教育', icon: '📚' },
+  { id: 'other', name: '其他', icon: '☕' }
+];
+
+// ============ State ============
+let currentTab = 'home';
+let currentRecordId = null;
+let selectedCategoryId = 'food';
+let selectedDate = todayStr();
+let amountValue = '';
+let statsMonthOffset = 0;
+let pieChartInstance = null;
+let lineChartInstance = null;
+let editingRecordId = null;
+
+
+function todayStr() {
+  const d = new Date();
+  return d.toISOString().split('T')[0];
+}
+
+function uuid() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+
+// ============ Storage ============
+function getRecords() {
+  return accountService.getRecords();
+}
+
+function saveRecords(records) {
+  accountService.saveRecords(records);
+}
+
+function getRecordById(id) {
+  return getRecords().find(r => r.id === id);
+}
+
+// ============ Routing ============
+function navigate(hash) {
+  location.hash = hash;
+}
+
+function handleRoute() {
+  const hash = location.hash || '#/';
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+
+  // Auth pages
+  if (hash === '#/login') {
+    if (accountService.isLoggedIn()) { navigate('#/'); return; }
+    document.getElementById('page-login').classList.add('active');
+    document.querySelector('.tab-item[data-tab="home"]')?.classList.add('active');
+    document.querySelector('.fab').style.display = 'none';
+    return;
+  } else if (hash === '#/register') {
+    if (accountService.isLoggedIn()) { navigate('#/'); return; }
+    document.getElementById('page-register').classList.add('active');
+    document.querySelector('.tab-item[data-tab="home"]')?.classList.add('active');
+    document.querySelector('.fab').style.display = 'none';
+    return;
+  }
+
+  // Protected routes
+  if (!accountService.isLoggedIn()) {
+    navigate('#/login');
+    return;
+  }
+
+  // Show FAB for all other pages
+  document.querySelector('.fab').style.display = 'flex';
+
+
+  if (hash === '#/' || hash === '#/home') {
+    document.getElementById('page-home').classList.add('active');
+    currentTab = 'home';
+    renderHome();
+  } else if (hash === '#/add') {
+    document.getElementById('page-add').classList.add('active');
+    currentTab = 'add';
+    initAddPage();
+  } else if (hash === '#/records') {
+    document.getElementById('page-records').classList.add('active');
+    currentTab = 'records';
+    renderRecords();
+  } else if (hash === '#/stats') {
+    document.getElementById('page-stats').classList.add('active');
+    currentTab = 'stats';
+    renderStats();
+  } else if (hash.startsWith('#/record/')) {
+    document.getElementById('page-record').classList.add('active');
+    currentTab = 'record';
+    const id = hash.split('/')[2];
+    renderRecordDetail(id);
+  } else if (hash === '#/me') {
+    document.getElementById('page-me').classList.add('active');
+    currentTab = 'me';
+    renderMe();
+  } else {
+    document.getElementById('page-home').classList.add('active');
+    currentTab = 'home';
+    renderHome();
+  }
+
+  document.querySelector(`.tab-item[data-tab="${currentTab}"]`)?.classList.add('active');
+}
+
+function goHome() { navigate('#/'); }
+function goAdd() { navigate('#/add'); }
+function goBack() { history.back(); }
+
+// ============ Auth ============
+function doLogin() {
+  const username = document.getElementById('login-username').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errorEl = document.getElementById('login-error');
+
+  if (!username || !password) {
+    errorEl.textContent = '请输入用户名和密码';
+    errorEl.classList.add('show');
+    return;
+  }
+
+  const result = accountService.login(username, password);
+  if (result.success) {
+    errorEl.classList.remove('show');
+    showToast('登录成功');
+    navigate('#/');
+  } else {
+    errorEl.textContent = result.error;
+    errorEl.classList.add('show');
+  }
+}
+
+function doRegister() {
+  const username = document.getElementById('register-username').value.trim();
+  const password = document.getElementById('register-password').value;
+  const confirm = document.getElementById('register-confirm').value;
+  const errorEl = document.getElementById('register-error');
+
+  if (!username || !password) {
+    errorEl.textContent = '请填写所有字段';
+    errorEl.classList.add('show');
+    return;
+  }
+
+  if (!/^[a-zA-Z0-9]{3,20}$/.test(username)) {
+    errorEl.textContent = '用户名需3-20位字母或数字';
+    errorEl.classList.add('show');
+    return;
+  }
+
+  if (password.length < 6) {
+    errorEl.textContent = '密码至少6位字符';
+    errorEl.classList.add('show');
+    return;
+  }
+
+  if (password !== confirm) {
+    errorEl.textContent = '两次密码输入不一致';
+    errorEl.classList.add('show');
+    return;
+  }
+
+  const result = accountService.register(username, password);
+  if (result.success) {
+    errorEl.classList.remove('show');
+    showToast('注册成功');
+    navigate('#/');
+  } else {
+    errorEl.textContent = result.error;
+    errorEl.classList.add('show');
+  }
+}
+
+function doLogout() {
+  accountService.logout();
+  showToast('已退出登录');
+  navigate('#/login');
+}
+
+// ============ Toast ============
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+// ============ Home ============
+function renderHome() {
+  const today = todayStr();
+  const records = getRecords();
+  const todayRecords = records.filter(r => r.date === today);
+  const total = todayRecords.reduce((s, r) => s + r.amount, 0);
+  const count = todayRecords.length;
+
+  document.getElementById('today-amount').textContent = '¥' + (total / 100).toFixed(2);
+  document.getElementById('today-count').textContent = `共 ${count} 笔`;
+
+  const container = document.getElementById('recent-records');
+  const recent = records.slice(-5).reverse();
+
+  if (!recent.length) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="icon">📒</div>
+        <div class="desc">今天还没有记账哦<br>开始记一笔吧~</div>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = recent.map(r => {
+    const cat = CATEGORIES.find(c => c.id === r.categoryId) || CATEGORIES[9];
+    const time = new Date(r.createdAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    return `
+      <div class="record-item" onclick="navigate('#/record/${r.id}')">
+        <div class="record-icon">${cat.icon}</div>
+        <div class="record-info">
+          <div class="record-category">${cat.name}</div>
+          <div class="record-time">${time}</div>
+          ${r.note ? `<div class="record-note">${r.note}</div>` : ''}
+        </div>
+        <div class="record-amount">-¥${(r.amount / 100).toFixed(2)}</div>
+      </div>`;
+  }).join('');
+}
+
+// ============ Add Page ============
+function initAddPage() {
+  selectedCategoryId = 'food';
+  selectedDate = todayStr();
+  amountValue = '';
+  editingRecordId = null;
+
+  document.getElementById('amount-input').value = '';
+  document.getElementById('date-input').value = selectedDate;
+  document.getElementById('note-input').value = '';
+  document.getElementById('save-btn').disabled = true;
+  document.getElementById('save-btn').textContent = '保存';
+
+  // Render categories
+  const selector = document.getElementById('category-selector');
+  selector.innerHTML = CATEGORIES.map(c => `
+    <div class="category-chip ${c.id === selectedCategoryId ? 'selected' : ''}"
+         onclick="selectCategory('${c.id}')">
+      <span class="icon">${c.icon}</span>${c.name}
+    </div>`).join('');
+
+  // Direct input handling
+  const amountInput = document.getElementById('amount-input');
+  amountInput.oninput = function() {
+    let val = this.value.replace(/[^0-9.]/g, '');
+    const parts = val.split('.');
+    if (parts[1]) {
+      parts[1] = parts[1].slice(0, 2);
+      val = parts.join('.');
+    }
+    this.value = val;
+    amountValue = val;
+    const amount = parseFloat(val) * 100;
+    document.getElementById('save-btn').disabled = !amount || amount <= 0;
+  };
+
+  setTimeout(() => document.getElementById('amount-input').focus(), 100);
+}
+
+function selectCategory(id) {
+  selectedCategoryId = id;
+  document.querySelectorAll('.category-chip').forEach(c => {
+    c.classList.toggle('selected', c.dataset.id === undefined && c.onclick.toString().includes(id));
+  });
+  document.querySelectorAll('.category-chip').forEach(c => {
+    if (c.onclick.toString().includes(`'${id}'`)) c.classList.add('selected');
+    else c.classList.remove('selected');
+  });
+}
+
+function handleKey(key) {
+  if (key === 'del') {
+    amountValue = amountValue.slice(0, -1);
+  } else if (key === '.') {
+    if (!amountValue.includes('.')) amountValue += '.';
+  } else {
+    if (amountValue.length >= 10) return;
+    // Limit to 2 decimal places
+    const parts = amountValue.split('.');
+    if (parts[1] && parts[1].length >= 2) return;
+    amountValue += key;
+  }
+
+  const display = amountValue || '0';
+  document.getElementById('amount-input').value = display;
+  const amount = parseFloat(display) * 100;
+  document.getElementById('save-btn').disabled = !amount || amount <= 0;
+}
+
+function saveRecord() {
+  const amount = parseFloat(amountValue) * 100;
+  if (!amount || amount <= 0) return;
+
+  const records = getRecords();
+  const now = Date.now();
+
+  if (editingRecordId) {
+    const idx = records.findIndex(r => r.id === editingRecordId);
+    if (idx !== -1) {
+      records[idx] = {
+        ...records[idx],
+        amount,
+        categoryId: selectedCategoryId,
+        date: selectedDate,
+        note: document.getElementById('note-input').value.trim(),
+        updatedAt: now
+      };
+    }
+    saveRecords(records);
+    showToast('已更新');
+  } else {
+    const record = {
+      id: uuid(),
+      amount,
+      categoryId: selectedCategoryId,
+      date: selectedDate,
+      note: document.getElementById('note-input').value.trim(),
+      createdAt: now,
+      updatedAt: now
+    };
+    records.push(record);
+    saveRecords(records);
+    showToast(`已记账 +¥${(amount / 100).toFixed(2)}`);
+  }
+
+  navigate('#/');
+}
+
+// ============ Records Page ============
+function renderRecords() {
+  const records = getRecords().slice().reverse();
+  const container = document.getElementById('records-list');
+
+  if (!records.length) {
+    container.innerHTML = `
+      <div class="card">
+        <div class="empty-state">
+          <div class="icon">📒</div>
+          <div class="desc">还没有任何记账记录<br>快去记一笔吧~</div>
+        </div>
+      </div>`;
+    return;
+  }
+
+  // Group by date
+  const groups = {};
+  records.forEach(r => {
+    if (!groups[r.date]) groups[r.date] = [];
+    groups[r.date].push(r);
+  });
+
+  container.innerHTML = Object.keys(groups).sort((a, b) => b.localeCompare(a)).map(date => {
+    const dayRecords = groups[date];
+    const dayTotal = dayRecords.reduce((s, r) => s + r.amount, 0);
+    const dateLabel = date === todayStr() ? '今天' : new Date(date + 'T00:00:00').toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', weekday: 'short' });
+    return `
+      <div class="day-group">
+        <div class="day-header">${dateLabel}<span class="day-total">-¥${(dayTotal / 100).toFixed(2)}</span></div>
+        <div class="card" style="padding:0 16px">
+          ${dayRecords.map(r => {
+            const cat = CATEGORIES.find(c => c.id === r.categoryId) || CATEGORIES[9];
+            const time = new Date(r.createdAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+            return `
+              <div class="swipe-wrapper" id="swipe-${r.id}">
+                <div class="record-item" onclick="navigate('#/record/${r.id}')" style="padding-right:0">
+                  <div class="record-icon">${cat.icon}</div>
+                  <div class="record-info">
+                    <div class="record-category">${cat.name}</div>
+                    <div class="record-time">${time}</div>
+                    ${r.note ? `<div class="record-note">${r.note}</div>` : ''}
+                  </div>
+                  <div class="record-amount">-¥${(r.amount / 100).toFixed(2)}</div>
+                </div>
+                <div class="swipe-delete" onclick="deleteRecord('${r.id}')">删除</div>
+              </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+  }).join('');
+
+  // Touch swipe handler
+  document.querySelectorAll('.swipe-wrapper').forEach(wrapper => {
+    let startX = 0;
+    let isOpen = false;
+
+
+    wrapper.addEventListener('touchstart', e => {
+      startX = e.touches[0].clientX;
+    }, { passive: true });
+
+
+    wrapper.addEventListener('touchend', e => {
+      const diff = e.changedTouches[0].clientX - startX;
+      if (diff < -50 && !isOpen) {
+        wrapper.classList.add('open');
+        isOpen = true;
+      } else if (diff > 50 && isOpen) {
+        wrapper.classList.remove('open');
+        isOpen = false;
+      }
+    }, { passive: true });
+  });
+}
+
+function deleteRecord(id) {
+  if (!confirm('确定删除这笔记账记录吗？')) return;
+  const records = getRecords().filter(r => r.id !== id);
+  saveRecords(records);
+  showToast('已删除');
+  renderRecords();
+  renderHome();
+}
+
+// ============ Stats Page ============
+function getStatsMonth(offset) {
+  const d = new Date();
+  d.setMonth(d.getMonth() + offset);
+  return d;
+}
+
+function renderStats() {
+  const d = getStatsMonth(statsMonthOffset);
+  const year = d.getFullYear();
+  const month = d.getMonth();
+  const label = `${year}年${String(month + 1).padStart(2, '0')}月`;
+  document.getElementById('stats-month-label').textContent = label;
+
+  const records = getRecords();
+  const monthRecords = records.filter(r => {
+    const rd = new Date(r.date + 'T00:00:00');
+    return rd.getFullYear() === year && rd.getMonth() === month;
+  });
+
+  const total = monthRecords.reduce((s, r) => s + r.amount, 0);
+  document.getElementById('stats-total').textContent = '¥' + (total / 100).toFixed(2);
+
+  // Compare with previous month
+  const prevD = new Date(year, month - 1, 1);
+  const prevRecords = records.filter(r => {
+    const rd = new Date(r.date + 'T00:00:00');
+    return rd.getFullYear() === prevD.getFullYear() && rd.getMonth() === prevD.getMonth();
+  });
+  const prevTotal = prevRecords.reduce((s, r) => s + r.amount, 0);
+
+  if (prevTotal > 0) {
+    const diff = ((total - prevTotal) / prevTotal * 100).toFixed(1);
+    const arrow = total >= prevTotal ? '↑' : '↓';
+    document.getElementById('stats-compare').textContent = `${arrow}${Math.abs(diff)}%`;
+  } else {
+    document.getElementById('stats-compare').textContent = '--';
+  }
+
+  // Pie chart
+  const byCategory = {};
+  monthRecords.forEach(r => {
+    byCategory[r.categoryId] = (byCategory[r.categoryId] || 0) + r.amount;
+  });
+
+  const catLabels = [];
+  const catData = [];
+  const catColors = ['#C4A77D','#E8A0A0','#7CB08A','#F5D89A','#F0C4C4','#A8C4A8','#D4A574','#B8C9A8','#D4A5C4','#C9C4A8'];
+
+  CATEGORIES.forEach((c, i) => {
+    if (byCategory[c.id]) {
+      catLabels.push(c.name);
+      catData.push(byCategory[c.id] / 100);
+    }
+  });
+
+  if (pieChartInstance) pieChartInstance.destroy();
+  const pieCtx = document.getElementById('pie-chart').getContext('2d');
+  pieChartInstance = new Chart(pieCtx, {
+    type: 'doughnut',
+    data: {
+      labels: catLabels,
+      datasets: [{ data: catData, backgroundColor: catColors.slice(0, catLabels.length) }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: 'right', labels: { font: { size: 12 }, boxWidth: 12 } } }
+    }
+  });
+
+  // Line chart - last 6 months
+  const lineLabels = [];
+  const lineData = [];
+
+  for (let i = 5; i >= 0; i--) {
+    const ld = new Date();
+    ld.setMonth(ld.getMonth() - i);
+    const ly = ld.getFullYear();
+    const lm = ld.getMonth();
+    lineLabels.push(`${ly}/${lm + 1}`);
+
+
+    const monthTotal = records.filter(r => {
+      const rd = new Date(r.date + 'T00:00:00');
+      return rd.getFullYear() === ly && rd.getMonth() === lm;
+    }).reduce((s, r) => s + r.amount, 0);
+
+    lineData.push(monthTotal / 100);
+  }
+
+  if (lineChartInstance) lineChartInstance.destroy();
+  const lineCtx = document.getElementById('line-chart').getContext('2d');
+  lineChartInstance = new Chart(lineCtx, {
+    type: 'line',
+    data: {
+      labels: lineLabels,
+      datasets: [{
+        label: '支出',
+        data: lineData,
+        borderColor: '#C4A77D',
+        backgroundColor: 'rgba(139,115,85,0.15)',
+        fill: true,
+        tension: 0.4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true } }
+    }
+  });
+
+  // Top day
+  const byDay = {};
+  monthRecords.forEach(r => {
+    byDay[r.date] = (byDay[r.date] || 0) + r.amount;
+  });
+
+
+  let topDay = null;
+  let topAmount = 0;
+  Object.entries(byDay).forEach(([d, a]) => {
+    if (a > topAmount) { topAmount = a; topDay = d; }
+  });
+
+  if (topDay) {
+    const topDayLabel = new Date(topDay + 'T00:00:00').toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+    document.getElementById('top-day-text').textContent = `${topDayLabel} 花了 ¥${(topAmount / 100).toFixed(2)}`;
+    document.getElementById('top-day').style.display = 'inline-flex';
+  } else {
+    document.getElementById('top-day').style.display = 'none';
+  }
+}
+
+function changeMonth(delta) {
+  statsMonthOffset += delta;
+  renderStats();
+}
+
+// ============ Record Detail ============
+function renderRecordDetail(id) {
+  const record = getRecordById(id);
+  if (!record) { goHome(); return; }
+
+  currentRecordId = id;
+  const cat = CATEGORIES.find(c => c.id === record.categoryId) || CATEGORIES[9];
+
+  document.getElementById('detail-amount').textContent = `-¥${(record.amount / 100).toFixed(2)}`;
+  document.getElementById('detail-date').textContent = new Date(record.date + 'T00:00:00').toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+  document.getElementById('detail-icon').textContent = cat.icon;
+  document.getElementById('detail-category').textContent = cat.name;
+
+  const noteBox = document.getElementById('detail-note-box');
+  if (record.note) {
+    noteBox.style.display = 'block';
+    document.getElementById('detail-note-text').textContent = record.note;
+  } else {
+    noteBox.style.display = 'none';
+  }
+}
+
+function editRecord() {
+  const record = getRecordById(currentRecordId);
+  if (!record) return;
+
+  editingRecordId = currentRecordId;
+  selectedCategoryId = record.categoryId;
+  selectedDate = record.date;
+  amountValue = (record.amount / 100).toFixed(2);
+
+  navigate('#/add');
+
+
+  // Re-init add page with data
+  setTimeout(() => {
+    document.getElementById('amount-input').value = amountValue;
+    document.getElementById('date-input').value = selectedDate;
+    document.getElementById('note-input').value = record.note || '';
+    document.getElementById('save-btn').disabled = false;
+    document.getElementById('save-btn').textContent = '更新';
+
+
+    document.querySelectorAll('.category-chip').forEach(c => {
+      if (c.onclick.toString().includes(`'${selectedCategoryId}'`)) c.classList.add('selected');
+      else c.classList.remove('selected');
+    });
+  }, 100);
+}
+
+function confirmDelete() {
+  if (!confirm('确定删除这笔记账记录吗？')) return;
+  const records = getRecords().filter(r => r.id !== currentRecordId);
+  saveRecords(records);
+  showToast('已删除');
+  goHome();
+}
+
+// ============ Me Page ============
+function renderMe() {
+  const records = getRecords();
+  const totalCount = records.length;
+  const totalAmount = records.reduce((s, r) => s + r.amount, 0);
+
+  const daysSet = new Set();
+  records.forEach(r => daysSet.add(r.date));
+  const totalDays = daysSet.size;
+
+  const byDay = {};
+  records.forEach(r => { byDay[r.date] = (byDay[r.date] || 0) + r.amount; });
+  let topDay = null;
+  let topAmount = 0;
+  Object.entries(byDay).forEach(([d, a]) => {
+    if (a > topAmount) { topAmount = a; topDay = d; }
+  });
+
+  document.getElementById('me-username').textContent = accountService.getCurrentUser()?.username || '';
+  document.getElementById('me-total-count').textContent = totalCount;
+  document.getElementById('me-total-amount').textContent = '¥' + (totalAmount / 100).toFixed(2);
+  document.getElementById('me-days').textContent = totalDays;
+  document.getElementById('me-top-day').textContent = topDay
+    ? new Date(topDay + 'T00:00:00').toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }) + ' ¥' + (topAmount / 100).toFixed(2)
+    : '--';
+}
+
+// ============ Init ============
+function init() {
+  // Tab navigation
+  document.querySelectorAll('.tab-item').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const tabName = tab.dataset.tab;
+      if (tabName === 'home') navigate('#/');
+      else if (tabName === 'records') navigate('#/records');
+      else if (tabName === 'stats') navigate('#/stats');
+      else if (tabName === 'me') navigate('#/me');
+    });
+  });
+
+  window.addEventListener('hashchange', handleRoute);
+  handleRoute();
+}
+
+init();
+  </script>
+</body>
+</html>
